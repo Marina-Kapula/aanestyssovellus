@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Äänestyssovellus Prototyyppi</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; }
+  h1, h2 { color: #333; }
+  button { margin: 5px 0; padding: 8px 12px; cursor: pointer; }
+  .hidden { display: none; }
+  ul { list-style: none; padding: 0; }
+  li { padding: 8px; border: 1px solid #ccc; margin-bottom: 5px; }
+  input[type="text"] { width: 100%; padding: 6px; margin: 5px 0 10px 0; }
+  label { display: block; margin-top: 10px; }
+  .vote-option { margin-left: 20px; }
+  .admin-section { border: 1px solid #666; padding: 10px; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Äänestyssovellus</h1>
+
+<!-- Головна сторінка -->
+<div id="home">
+  <h2>Äänestykset</h2>
+  <ul id="pollList"></ul>
+  <button onclick="showAdmin()">Kirjaudu ylläpitäjäksi</button>
+</div>
+
+<!-- Äänestyksen tulokset Результати опитування-->
+<div id="results" class="hidden">
+  <h2 id="resultsTitle"></h2>
+  <ul id="resultsList"></ul>
+  <button onclick="backToHome()">Takaisin äänestyksiin</button>
+</div>
+
+<!-- Äänestäminen Вигляд адміністратора -->
+<div id="vote" class="hidden">
+  <h2 id="voteTitle"></h2>
+  <form id="voteForm"></form>
+  <button onclick="submitVote()">Äänestä</button>
+  <button onclick="backToHome()">Peruuta</button>
+</div>
+
+<!-- Ylläpitäjän näkymä Видалити опитування-->
+<div id="admin" class="hidden admin-section">
+  <h2>Ylläpitäjä</h2>
+  <h3>Uuden äänestyksen luominen</h3>
+  <input type="text" id="newPollTitle" placeholder="Äänestyksen otsikko" />
+  <textarea id="newPollOptions" placeholder="Kirjoita vaihtoehdot pilkuilla erotettuna esim. Kyllä, Ei, Ehkä" rows="3" style="width:100%;"></textarea>
+  <button onclick="createPoll()">Luo äänestys</button>
+
+  <h3>Poista äänestys</h3>
+  <ul id="adminPollList"></ul>
+
+  <button onclick="logoutAdmin()">Kirjaudu ulos</button>
+</div>
+
+<script>
+  // Esimerkkidatat äänestyksistä
+  let polls = [
+    {
+      id: 1,
+      title: "Pidätkö kahvista?",
+      options: ["Kyllä", "Ei", "En tiedä"],
+      votes: [5, 2, 1]
+    },
+    {
+      id: 2,
+      title: "Mikä on suosikkivärisi?",
+      options: ["Punainen", "Sininen", "Vihreä", "Keltainen"],
+      votes: [3, 7, 4, 2]
+    }
+  ];
+
+  let currentPollId = null;
+
+  function renderPollList() {
+    const list = document.getElementById('pollList');
+    list.innerHTML = '';
+    polls.forEach(poll => {
+      const li = document.createElement('li');
+      li.textContent = poll.title;
+      li.style.cursor = "pointer";
+      li.onclick = () => showVote(poll.id);
+      list.appendChild(li);
+    });
+  }
+
+  function showVote(id) {
+    currentPollId = id;
+    const poll = polls.find(p => p.id === id);
+    document.getElementById('voteTitle').textContent = "Äänestä: " + poll.title;
+    const form = document.getElementById('voteForm');
+    form.innerHTML = '';
+    poll.options.forEach((option, i) => {
+      const label = document.createElement('label');
+      label.className = 'vote-option';
+      label.innerHTML = `<input type="radio" name="voteOption" value="${i}" /> ${option}`;
+      form.appendChild(label);
+    });
+    showSection('vote');
+  }
+
+  function submitVote() {
+    const form = document.getElementById('voteForm');
+    const selected = form.voteOption.value;
+    if(selected === undefined) {
+      alert("Valitse vaihtoehto!");
+      return;
+    }
+    polls = polls.map(p => {
+      if(p.id === currentPollId) {
+        p.votes[selected] = (p.votes[selected] || 0) + 1;
+      }
+      return p;
+    });
+    showResults(currentPollId);
+  }
+
+  function showResults(id) {
+    currentPollId = id;
+    const poll = polls.find(p => p.id === id);
+    document.getElementById('resultsTitle').textContent = "Tulokset: " + poll.title;
+    const resultsList = document.getElementById('resultsList');
+    resultsList.innerHTML = '';
+    poll.options.forEach((option, i) => {
+      const votes = poll.votes[i] || 0;
+      const li = document.createElement('li');
+      li.textContent = `${option}: ${votes} ääntä`;
+      resultsList.appendChild(li);
+    });
+    showSection('results');
+  }
+  // Повернутися на головну сторінку  backToHome
+  function backToHome() {
+    showSection('home');
+  }
+
+  function showAdmin() {
+    showSection('admin');
+    renderAdminPollList();
+  }
+
+  function logoutAdmin() {
+    showSection('home');
+  }
+
+  function renderAdminPollList() {
+    const list = document.getElementById('adminPollList');
+    list.innerHTML = '';
+    polls.forEach(poll => {
+      const li = document.createElement('li');
+      li.textContent = poll.title + " ";
+      const delBtn = document.createElement('button');
+      delBtn.textContent = "Poista";
+      delBtn.onclick = () => {
+        polls = polls.filter(p => p.id !== poll.id);
+        renderAdminPollList();
+        renderPollList();
+      };
+      li.appendChild(delBtn);
+      list.appendChild(li);
+    });
+  }
+
+  function createPoll() {
+    const title = document.getElementById('newPollTitle').value.trim();
+    const optionsText = document.getElementById('newPollOptions').value.trim();
+    if(!title || !optionsText) {
+      alert("Täytä otsikko ja vaihtoehdot");
+      return;
+    }
+    const options = optionsText.split(',').map(o => o.trim()).filter(o => o);
+    if(options.length < 2) {
+      alert("Tarvitaan vähintään kaksi vaihtoehtoa");
+      return;
+    }
+    const newPoll = {
+      id: Date.now(),
+      title,
+      options,
+      votes: new Array(options.length).fill(0)
+    };
+    polls.push(newPoll);
+    document.getElementById('newPollTitle').value = '';
+    document.getElementById('newPollOptions').value = '';
+    renderAdminPollList();
+    renderPollList();
+    alert("Uusi äänestys luotu!");
+  }
+
+  function showSection(sectionId) {
+    ['home', 'results', 'vote', 'admin'].forEach(id => {
+      document.getElementById(id).classList.toggle('hidden', id !== sectionId);
+    });
+  }
+
+  // Aloita etusivulla
+  renderPollList();
+</script>
+
+</body>
+</html>
